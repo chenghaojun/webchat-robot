@@ -30,6 +30,7 @@ function getLoginStatus(){
 	  			$(".notice").html('扫描成功，请确认登录');
 	  		}else if (data.status == 2) {
 	  			//&fun=new&version=v2&lang=zh_CN 不加的话会返回1101错误代码
+                console.log(data);
 	  			$.post('index.php?act=cookies',{url:data.msg + '&fun=new&version=v2&lang=zh_CN'},function(res){
 	  				console.log(res);
 	  				if (res.status == 0){

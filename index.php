@@ -1,6 +1,6 @@
 <?php
-require_once ('src/wechat.php');
-$wechat = new wechat();
+require_once('src/WebChat.php');
+$wechat = new WebChat();
 $act = isset($_GET['act'])?$_GET['act']:'index';
 session_start();
 /*$res = $wechat->getLoginStatus();

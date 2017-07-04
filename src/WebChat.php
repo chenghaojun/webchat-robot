@@ -16,12 +16,11 @@
 *  9.向用户发送消息
 **/
 
-class wechat {
-
+class WebChat {
 	/**
 	* uuid 微信服务器返回的会话id
-	**/
-	private $uuid = '';
+	**/	private $uuid = '';
+
 
 	/**
 	* loginUrl 扫描二维码并确认后返回的登录url
@@ -76,15 +75,24 @@ class wechat {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // 从证书中检查SSL加密算法是否存在
 	    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	    curl_setopt($ch, CURLOPT_HEADER, 0);
-	    if($cookie){
+
+        if($cookie) {
 	    	curl_setopt($ch, CURLOPT_COOKIEFILE, $cookie);
-	    	curl_setopt ($ch, CURLOPT_REFERER,'https://wx.qq.com');
+	    	curl_setopt ($ch, CURLOPT_REFERER,'https://wx2.qq.com/?&lang=zh_CN');
 	    }
-	    if($type){
-	    	$header = array(
-            'Content-Type: application/json',
-        	);
-	    curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+	    if($type) {
+//	    	$header = array(
+//                'Content-Type: application/json;charset=UTF-8',
+//                'Host: wx2.qq.com',
+//                'Pragma:no-cache',
+//                'Accept-Encoding:gzip, deflate, br',
+//                'Accept-Language:zh-CN,zh;q=0.8,en;q=0.6,zh-TW;q=0.4,ja;q=0.2',
+//                'Cache-Control:no-cache',
+//            );
+            $header = array(
+                'Content-Type: application/json;charset=UTF-8'
+            );
+	        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
 	    }
 	    
 	    curl_setopt($ch, CURLOPT_POST, 1);
@@ -92,6 +100,11 @@ class wechat {
 	    curl_setopt($ch, CURLOPT_SAFE_UPLOAD, 0);
 	    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
 	    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+
+        curl_setopt($ch, CURLOPT_VERBOSE, true);
+        $verbose = fopen('./curl.debug', 'w+');
+        curl_setopt($ch, CURLOPT_STDERR, $verbose);
+
 	    $output = curl_exec($ch);
 	    curl_close($ch);
 	    return $output;
@@ -103,8 +116,7 @@ class wechat {
 	 * @return string
 	 * 
 	 **/
-	 private function getMillisecond()
-	{
+    private function getMillisecond() {
 	    list($usec, $sec) = explode(" ", microtime());
 	    return (float)sprintf('%.0f',(floatval($usec)+floatval($sec))*1000);
 	}
@@ -115,11 +127,12 @@ class wechat {
 	* @access public
 	* @return string
 	**/
-	public function getUuid(){
+	public function getUuid() {
 		$url = 'https://login.weixin.qq.com/jslogin?appid=wx782c26e4c19acffb&redirect_uri=https%3A%2F%2Fwx.qq.com%2Fcgi-bin%2Fmmwebwx-bin%2Fwebwxnewloginpage&fun=new&lang=zh_CN&_='.$this->getMillisecond();
 		$str = $this->get($url);
 		preg_match('/"(.*?)"/',$str,$match);
 		$_SESSION['uuid'] = $match[1];
+		$this->uuid = $_SESSION['uuid'];
 		return $match[1]; 
 	}
 
@@ -128,7 +141,7 @@ class wechat {
 	* @access public
 	* @return string
 	**/
-	public function getQrcode($uuid){
+	public function getQrcode($uuid) {
 		$url = 'https://login.weixin.qq.com/qrcode/'.$uuid.'?t=webwx';
 		return "<img src='$url' />";
 	}
@@ -143,9 +156,9 @@ class wechat {
 		$url = sprintf("https://login.wx2.qq.com/cgi-bin/mmwebwx-bin/login?uuid=%s&tip=1&_=%s", $uuid, $this->getMillisecond());
 		$res = $this->get($url);
 		preg_match('/=(.*?);/',$res,$match);
-		if($match[1] == 200){
-			//登陆成功
-			preg_match('/redirect_uri="(.*?)";/',$res,$match2);
+		if($match[1] == 200) {
+			// 登陆成功
+			preg_match('/redirect_uri="(.*?)";/', $res, $match2);
 			return $match2[1];
 		}
 		return $match[1];
@@ -157,7 +170,7 @@ class wechat {
 	* @param $url string 登录地址
 	* @return array
 	**/
-	public function getCookies($url){
+	public function getCookies($url) {
        	$cookie_jar = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
        
         $ch = curl_init($url);
@@ -167,22 +180,46 @@ class wechat {
         curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);//将 curl_exec()获取的信息以文件流的形式返回，而不是直接输出。设置为0是直接输出
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
         curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
-        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_jar);//获取的cookie 保存到指定的 文件路径
-        $content=curl_exec($ch);     
-        if(curl_errno($ch)){
-        	$info = array('status' => 0, 'msg' => 'Curl error: '.curl_error($ch));
-        	return $info;//这里是设置个错误信息的反馈
-         }    
+        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookie_jar);// 获取的cookie 保存到指定的 文件路径
+        $response = curl_exec($ch);
 
-        if($content==false){
-            $info = array('status' => 0, 'msg' => '无法获取cookies');
-        	return $info;//这里是设置个错误信息的反馈
+        if(curl_errno($ch)) {
+            $info = array('status' => 0, 'msg' => 'Curl error: '.curl_error($ch));
+            return $info;//这里是设置个错误信息的反馈
         }
-         
-        //正则匹配出wxuin、wxsid
-        preg_match('/wxuin=;/iU',$content,$uin); 
-        preg_match('/wxsid=(.*);/iU',$content,$sid);
-        preg_match('/webwx_data_ticket=(.*);/iU',$content,$webwx);
+
+        if($response == false) {
+            $info = array('status' => 0, 'msg' => '无法获取cookies');
+            return $info;//这里是设置个错误信息的反馈
+        }
+
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $header = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+        $body_arr = $this->xmlToArray($body);
+
+        $_SESSION['skey'] = $body_arr['skey'];
+        $_SESSION['pass_ticket'] = $body_arr['pass_ticket'];
+        $_SESSION['wxsid'] = $body_arr['wxsid'];
+        $_SESSION['wxuin'] = $body_arr['wxuin'];
+
+        // 正则匹配出wxuin、wxsid
+        /*
+         *
+         <error>
+            <ret>0</ret>
+            <message>
+            </message>
+            <skey>@crypt_5ab34c8c_fa1f4a21d1cf3229d8d45a1192ae7c26</skey>
+            <wxsid>MCVWcw6InLK1DhHE</wxsid>
+            <wxuin>2282218517</wxuin>
+            <pass_ticket>MRI%2BQyoOSALyPG%2FbrPBr4EQmLTtWLkeCajDH5P5p9JqiSOV77pXijt7V83Sl9xrS</pass_ticket>
+            <isgrayscale>1</isgrayscale>
+        </error>
+         */
+//        preg_match('/wxuin=;/iU', $response, $uin);
+//        preg_match('/wxsid=(.*);/iU', $response, $sid);
+//        preg_match('/webwx_data_ticket=(.*);/iU', $response, $webwx);
         //@TODO将wxuin、wxsid、webwx_data_ticket存入cookies，以便获取微信头像----暂无效 
         /*if(preg_match_all('/Set-Cookie:[\s]+([^=]+)=([^;]+)/i', $content,$match)) {
 		  foreach ($match[1] as $key => $cookieKey ) {
@@ -190,12 +227,12 @@ class wechat {
 		  }
 		}*/
         //将wxuin、wxsid、webwx_data_ticket存入session
-        $_SESSION['uin'] = @$uin[1];
-        $_SESSION['sid'] = @$sid[1];
+        $_SESSION['uin'] = $body_arr['wxuin'];
+        $_SESSION['sid'] = $body_arr['wxsid'];
         $wxinfo = array(
-        	'uin' => @$uin[1],
-        	'sid' => @$sid[1]
-        	);
+        	'uin' => $body_arr['wxuin'],
+        	'sid' => $body_arr['wxsid']
+        );
         curl_close($ch);
         return $wxinfo;
 	}
@@ -209,21 +246,24 @@ class wechat {
 	**/
 	public function initWebchat($uin = '', $sid = ''){
 		$cookie_jar = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
-		$url = sprintf("https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=%s", $this->getMillisecond());
+//		$url = sprintf("https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=%s", $this->getMillisecond());
+        $url = sprintf("https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxinit?r=%s&lang=zh_CN&pass_ticket=%s", $this->getMillisecond(), $_SESSION['pass_ticket']);
 		
-		if(!$uin || !$sid){
+		if(!$uin || !$sid) {
 			  $uin = $_SESSION['uin'];
         	  $sid = $_SESSION['sid'];
 		}
 		$data['BaseRequest'] = array(
 			'Uin' => $uin,
 			'Sid' => $sid,
-			'Skey' => '',
+			'Skey' => $_SESSION['skey'],
 			'DeviceID' => 'e189320295398756'
-			);
-		$res = $this->post($url, json_encode($data),$cookie_jar);
-		//将登陆用户username、nickname存入session中
+        );
+
+		$res = $this->post($url, json_encode($data), $cookie_jar);
+		// 将登陆用户username、nickname存入session中
 		$user = json_decode($res, true);
+
 		$_SESSION['username'] = $user['User']['UserName'];
 		$_SESSION['nickname'] = $user['User']['NickName'];
 
@@ -239,7 +279,8 @@ class wechat {
 	**/
 	public function getContact($uin = '', $sid = ''){
 		$cookie_jar = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
-		$url = sprintf("https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?lang=zh_CN&r=%s&seq=0", $this->getMillisecond());
+//		$url = sprintf("https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?lang=zh_CN&r=%s&seq=0", $this->getMillisecond());
+        $url = sprintf("https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?lang=zh_CN&pass_ticket=%s&r=%s&seq=0&skey=%s", $this->getMillisecond());
 		if(!$uin || !$sid){
 			 
 			  $uin = $_SESSION['uin'];
@@ -262,7 +303,7 @@ class wechat {
 	    $uin = $_SESSION['uin'];
 	    $sid = $_SESSION['sid'];
 		$cookie_jar = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
-		$url = sprintf("https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxsync?sid=%s", $sid);
+		$url = sprintf("https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxsync?sid=%s", $sid);
 		
 		$data['BaseRequest'] = array(
 			'Uin' => $uin,
@@ -286,7 +327,7 @@ class wechat {
 	    $uin = $_SESSION['uin'];
 	    $sid = $_SESSION['sid'];
 		$cookie = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
-		$url = sprintf("https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxsendmsg?sid=%s&r=%s",$sid,$this->getMillisecond());
+		$url = sprintf("https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxsendmsg?sid=%s&r=%s",$sid,$this->getMillisecond());
 		
 		$data['BaseRequest'] = array(
 			'Uin' => $uin,
@@ -316,7 +357,7 @@ class wechat {
 	**/
 	public function  getAvatar($uri = ''){
 	    $cookie = dirname(__FILE__)."/".$_SESSION['uuid'].".cookie";
-		$url = "https://wx.qq.com".$uri;
+		$url = "https://wx2.qq.com".$uri;
 		$res = $this->get($url, $cookie);
 		echo $res;
 		}
@@ -336,7 +377,7 @@ class wechat {
 		$res = $this->post($this->tlApi,json_encode($data,JSON_UNESCAPED_UNICODE),'',1);
 		$r = json_decode($res,true);
 		//文本类
-		if(isset($r['url'])){
+		if(isset($r['url'])) {
 			//存在链接则发送链接
 			return $r['url'];
 		}
@@ -355,4 +396,16 @@ class wechat {
 	  }
 	  return $data;
 	}
+
+    /**
+     * 将 xml 转换成数组便于操作
+     * @param $xml
+     * @return mixed
+     */
+    function xmlToArray($xml) {
+        libxml_disable_entity_loader(true);
+        $values = json_decode(json_encode(simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA)), true);
+        return $values;
+    }
+
 }
